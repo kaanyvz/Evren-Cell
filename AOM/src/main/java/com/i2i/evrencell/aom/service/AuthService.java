@@ -1,6 +1,9 @@
 package com.i2i.evrencell.aom.service;
 
 import com.i2i.evrencell.aom.encryption.CustomerPasswordEncoder;
+import com.i2i.evrencell.aom.enumeration.TokenType;
+import com.i2i.evrencell.aom.model.Token;
+import com.i2i.evrencell.aom.model.User;
 import com.i2i.evrencell.aom.repository.CustomerRepository;
 import com.i2i.evrencell.aom.request.LoginCustomerRequest;
 import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
@@ -29,6 +32,7 @@ public class AuthService {
         this.customerPasswordEncoder = customerPasswordEncoder;
     }
 
+    //todo - generate token while registering user
     public ResponseEntity<String> registerCustomer(RegisterCustomerRequest registerCustomerRequest) throws SQLException,
             ClassNotFoundException, IOException, ProcCallException, InterruptedException {
 
@@ -67,5 +71,16 @@ public class AuthService {
             logger.warn("Invalid credentials for MSISDN: " + loginCustomerRequest.msisdn());
             return new ResponseEntity<>("Invalid credentials", HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    private void saveUserToken(User user, String jwtToken){
+        var token = Token.builder()
+                .userId(user.getUserId())
+                .token(jwtToken)
+                .tokenType(TokenType.BEARER)
+                .revoked(false)
+                .expired(false)
+                .build();
+        //todo - save token to oracle db with using procedure
     }
 }
