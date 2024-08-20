@@ -13,8 +13,7 @@ public class AomApplication implements CommandLineRunner {
     private final OracleConnection oracleConnection;
     private static final Logger logger = LogManager.getLogger(AomApplication.class);
 
-    public AomApplication(OracleConnection oracleConnection
-    ) {
+    public AomApplication(OracleConnection oracleConnection) {
         this.oracleConnection = oracleConnection;
     }
 
@@ -25,6 +24,5 @@ public class AomApplication implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         logger.debug(oracleConnection.getOracleConnection());
-
     }
 }

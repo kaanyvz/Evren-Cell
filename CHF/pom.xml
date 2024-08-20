@@ -108,11 +108,9 @@
 
         <!-- Kafka -->
         <dependency>
-            <groupId>com.i2i.evrencell</groupId>
+            <groupId>com.sk.i2i.evrencell.mq</groupId>
             <artifactId>Kafka</artifactId>
             <version>1.0-SNAPSHOT</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/Kafka.jar</systemPath>
         </dependency>
 
 

@@ -5,9 +5,9 @@ import java.util.Collection;
 public class Main {
     public static void main(String[] args) {
 
-           //--Put Operation (TGF)
-           // String putResult = HazelcastMWOperation.put("test17", "test17");
-           // System.out.println(putResult);
+//           --Put Operation (TGF)
+            String putResult = HazelcastMWOperation.put("test17", "test17");
+            System.out.println(putResult);
 
            //--Get Operation (COM)
            // String getResult = HazelcastTGFOperation.getAllMsisdn("test12");
