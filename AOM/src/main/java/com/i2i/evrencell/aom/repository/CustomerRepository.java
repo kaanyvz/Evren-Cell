@@ -2,17 +2,23 @@ package com.i2i.evrencell.aom.repository;
 
 import com.i2i.evrencell.aom.constant.OracleQueries;
 import com.i2i.evrencell.aom.encryption.CustomerPasswordEncoder;
+import com.i2i.evrencell.aom.enumeration.Role;
+import com.i2i.evrencell.aom.enumeration.TokenType;
 import com.i2i.evrencell.aom.exception.NotFoundException;
 import com.i2i.evrencell.aom.helper.OracleConnection;
 import com.i2i.evrencell.aom.model.Customer;
+import com.i2i.evrencell.aom.model.Token;
+import com.i2i.evrencell.aom.model.User;
 import com.i2i.evrencell.aom.request.CreateBalanceRequest;
 import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
+import com.i2i.evrencell.aom.response.AuthenticationResponse;
+import com.i2i.evrencell.aom.service.JWTService;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
 import oracle.jdbc.OracleTypes;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.stereotype.Repository;
 import org.voltdb.client.ProcCallException;
 
@@ -27,6 +33,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * This class is used to handle the database operations for the customers.
@@ -37,14 +44,23 @@ public class CustomerRepository {
     private final OracleConnection oracleConnection;
     private final BalanceRepository balanceRepository;
     private final CustomerPasswordEncoder customerPasswordEncoder;
+    private final JWTService jwtService;
+    private final TokenRepository tokenRepository;
+    private final AuthenticationManager authenticationManager;
     private final VoltdbOperator voltdbOperator = new VoltdbOperator();
     
     public CustomerRepository(OracleConnection oracleConnection,
                               BalanceRepository balanceRepository,
-                              CustomerPasswordEncoder customerPasswordEncoder) {
+                              CustomerPasswordEncoder customerPasswordEncoder,
+                              JWTService jwtService,
+                              TokenRepository tokenRepository,
+                              AuthenticationManager authenticationManager) {
         this.oracleConnection = oracleConnection;
         this.balanceRepository = balanceRepository;
         this.customerPasswordEncoder = customerPasswordEncoder;
+        this.jwtService = jwtService;
+        this.tokenRepository = tokenRepository;
+        this.authenticationManager = authenticationManager;
     }
 
     // ==ORACLE OPERATIONS==
@@ -113,11 +129,11 @@ public class CustomerRepository {
      * @throws SQLException
      * @throws ClassNotFoundException
      */
-    public ResponseEntity<String> createUserInOracle(RegisterCustomerRequest registerCustomerRequest) throws SQLException, ClassNotFoundException {
+    public AuthenticationResponse createUserInOracle(RegisterCustomerRequest registerCustomerRequest) throws SQLException, ClassNotFoundException {
 
         logger.debug("Creating customer in Oracle DB");
         if (customerExists(registerCustomerRequest.msisdn(), registerCustomerRequest.email(), registerCustomerRequest.TCNumber())) {
-            return new ResponseEntity<>("This customer already exists in Oracle DB.", HttpStatus.CONFLICT);
+            throw new RuntimeException("This customer already exists in Oracle DB.");
         }
         logger.debug("Connecting to Oracle DB");
         Connection connection = oracleConnection.getOracleConnection();
@@ -174,9 +190,88 @@ public class CustomerRepository {
                 .build();
         balanceRepository.createOracleBalance(createBalanceRequest);
 
+        User user = User.builder()
+                .userId(customerId)
+                .msisdn(registerCustomerRequest.msisdn())
+                .name(registerCustomerRequest.name())
+                .surname(registerCustomerRequest.surname())
+                .email(registerCustomerRequest.email())
+                .password(encodedPassword)
+                .TCNumber(registerCustomerRequest.TCNumber())
+                .sDate(new Timestamp(System.currentTimeMillis()))
+                .role(Role.USER)
+                .build();
+
+        String jwtToken = jwtService.generateToken(user);
+        logger.debug("JWT Token generated successfully for customer: " + registerCustomerRequest.msisdn());
+        String refreshToken = jwtService.generateRefreshToken(user);
+        logger.debug("Refresh Token generated successfully for customer: " + registerCustomerRequest.msisdn());
+
+        saveUserToken(user, jwtToken);
         connection.close();
 
-        return new ResponseEntity<>("Customer created successfully", HttpStatus.CREATED);
+        return AuthenticationResponse.builder()
+                .accessToken(jwtToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+    private void saveUserToken(User user, String jwtToken) {
+        Token token = Token.builder()
+                .userId(user.getUserId())
+                .token(jwtToken)
+                .tokenType(TokenType.BEARER)
+                .revoked(false)
+                .expired(false)
+                .build();
+
+        tokenRepository.addToken(token);
+    }
+
+    public Optional<User> findByMsisdn(String msisdn){
+        logger.debug("Finding user by MSISDN: " + msisdn);
+        Connection connection = null;
+        CallableStatement callableStatement = null;
+        ResultSet resultSet = null;
+        try {
+            connection = oracleConnection.getOracleConnection();
+            callableStatement = connection.prepareCall("{call FIND_USER_BY_MSISDN(?, ?)}");
+            callableStatement.setString(1, msisdn);
+            callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
+            callableStatement.execute();
+            resultSet = (ResultSet) callableStatement.getObject(2);
+            if (resultSet.next()) {
+                User user = User.builder()
+                        .userId(resultSet.getInt("USER_ID"))
+                        .msisdn(resultSet.getString("MSISDN"))
+                        .name(resultSet.getString("NAME"))
+                        .surname(resultSet.getString("SURNAME"))
+                        .email(resultSet.getString("EMAIL"))
+                        .password(resultSet.getString("PASSWORD"))
+                        .TCNumber(resultSet.getString("TC_NO"))
+                        .sDate(resultSet.getTimestamp("SDATE"))
+                        .role(Role.valueOf(resultSet.getString("ROLE")))
+                        .build();
+                return Optional.of(user);
+            }
+        } catch (SQLException | ClassNotFoundException e) {
+            logger.error("Error while finding user by MSISDN: " + msisdn, e);
+        } finally {
+            try {
+                if (resultSet != null) {
+                    resultSet.close();
+                }
+                if (callableStatement != null) {
+                    callableStatement.close();
+                }
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                logger.error("Error while closing resources", e);
+            }
+        }
+        return Optional.empty();
     }
 
 

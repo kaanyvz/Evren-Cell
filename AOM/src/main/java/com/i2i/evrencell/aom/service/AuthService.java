@@ -1,12 +1,10 @@
 package com.i2i.evrencell.aom.service;
 
 import com.i2i.evrencell.aom.encryption.CustomerPasswordEncoder;
-import com.i2i.evrencell.aom.enumeration.TokenType;
-import com.i2i.evrencell.aom.model.Token;
-import com.i2i.evrencell.aom.model.User;
 import com.i2i.evrencell.aom.repository.CustomerRepository;
 import com.i2i.evrencell.aom.request.LoginCustomerRequest;
 import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
+import com.i2i.evrencell.aom.response.AuthenticationResponse;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.i2i.hazelcast.utils.HazelcastMWOperation;
@@ -32,29 +30,26 @@ public class AuthService {
         this.customerPasswordEncoder = customerPasswordEncoder;
     }
 
-    //todo - generate token while registering user
-    public ResponseEntity<String> registerCustomer(RegisterCustomerRequest registerCustomerRequest) throws SQLException,
+    //todo - generate token while registering user (test it)
+    public AuthenticationResponse registerCustomer(RegisterCustomerRequest registerCustomerRequest) throws SQLException,
             ClassNotFoundException, IOException, ProcCallException, InterruptedException {
 
         logger.debug("Starting to register customer in Oracle and VoltDB with MSISDN: " + registerCustomerRequest.msisdn());
-        ResponseEntity<String> oracleResponse = customerRepository.createUserInOracle(registerCustomerRequest);
-        if (!oracleResponse.getStatusCode().is2xxSuccessful()) {
-            logger.error("Failed to create customer in Oracle for MSISDN: " + registerCustomerRequest.msisdn());
-            return oracleResponse;
-        }
+        AuthenticationResponse authenticationResponse = customerRepository.createUserInOracle(registerCustomerRequest);
 
         ResponseEntity<String> voltResponse = customerRepository.createUserInVoltdb(registerCustomerRequest);
         if (!voltResponse.getStatusCode().is2xxSuccessful()) {
             logger.error("Failed to create customer in VoltDB for MSISDN: " + registerCustomerRequest.msisdn());
-            return voltResponse;
+            throw new RuntimeException("Failed to create customer in VoltDB for MSISDN: " + registerCustomerRequest.msisdn());
         }
 
         HazelcastMWOperation.put(registerCustomerRequest.msisdn(), registerCustomerRequest.msisdn());
         logger.debug("Successfully registered customer in Oracle, VoltDB, and Hazelcast for MSISDN: " + registerCustomerRequest.msisdn());
 
-        return ResponseEntity.ok("Customer registered successfully in both Oracle and VoltDB");
+        return authenticationResponse;
     }
 
+    //todo - generate token while logging in user (test it)
     public ResponseEntity<String> login(LoginCustomerRequest loginCustomerRequest) throws SQLException, ClassNotFoundException {
         logger.debug("Attempting login for MSISDN: " + loginCustomerRequest.msisdn());
         String encodedPassword = customerRepository.getEncodedCustomerPasswordByMsisdn(loginCustomerRequest.msisdn());
@@ -73,14 +68,4 @@ public class AuthService {
         }
     }
 
-    private void saveUserToken(User user, String jwtToken){
-        var token = Token.builder()
-                .userId(user.getUserId())
-                .token(jwtToken)
-                .tokenType(TokenType.BEARER)
-                .revoked(false)
-                .expired(false)
-                .build();
-        //todo - save token to oracle db with using procedure
-    }
 }

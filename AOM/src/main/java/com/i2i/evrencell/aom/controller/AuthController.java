@@ -2,6 +2,7 @@ package com.i2i.evrencell.aom.controller;
 
 import com.i2i.evrencell.aom.request.LoginCustomerRequest;
 import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
+import com.i2i.evrencell.aom.response.AuthenticationResponse;
 import com.i2i.evrencell.aom.service.AuthService;
 import jakarta.validation.Valid;
 import org.apache.log4j.LogManager;
@@ -31,7 +32,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ResponseEntity<String>> registerCustomer(@Valid @RequestBody RegisterCustomerRequest registerCustomerRequest)
+    public ResponseEntity<AuthenticationResponse> registerCustomer(@Valid @RequestBody RegisterCustomerRequest registerCustomerRequest)
             throws SQLException, ClassNotFoundException, IOException, InterruptedException, ProcCallException {
         logger.debug("Request is taken, registering customer");
         return ResponseEntity.ok(authService.registerCustomer(registerCustomerRequest));
