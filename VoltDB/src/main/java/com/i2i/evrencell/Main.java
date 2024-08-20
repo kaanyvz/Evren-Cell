@@ -3,12 +3,14 @@ package com.i2i.evrencell;
 import com.i2i.evrencell.voltdb.UserDetails;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
 import com.i2i.evrencell.voltdb.VoltdbOperator2;
+import org.voltdb.client.ProcCallException;
 
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class Main {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException, ProcCallException {
 
         VoltdbOperator op = new VoltdbOperator();
 
@@ -16,11 +18,11 @@ public class Main {
         System.out.println(1);
 
 
-        for (int i = 0; i < 5; ++i) {
-            op.updateDataBalance(25000 - i, "905372117887");
-            System.out.println(op.getDataBalance("905372117887"));
-        }
-        op.close();
+//        for (int i = 0; i < 5; ++i) {
+//            op.updateDataBalance(25000 - i, "905372117887");
+//            System.out.println(op.getDataBalance("905372117887"));
+//        }
+//        op.close();
 
 
         double endTime = System.currentTimeMillis();
