@@ -1,6 +1,7 @@
 package com.i2i.evrencell.aom.encryption;
 
 import org.apache.tomcat.util.codec.binary.Base64;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -10,7 +11,7 @@ import javax.crypto.spec.DESedeKeySpec;
 import java.security.spec.KeySpec;
 
 @Component
-public class CustomerPasswordEncoder {
+public class CustomerPasswordEncoder implements PasswordEncoder {
     private static final String UNICODE_FORMAT = "UTF8";
     public static final String DESEDE_ENCRYPTION_SCHEME = "DESede";
     private final Cipher cipher;
@@ -67,4 +68,13 @@ public class CustomerPasswordEncoder {
         return decryptedText;
     }
 
+    @Override
+    public String encode(CharSequence rawPassword) {
+        return encrypt(rawPassword.toString());
+    }
+
+    @Override
+    public boolean matches(CharSequence rawPassword, String encodedPassword) {
+        return rawPassword.toString().equals(decrypt(encodedPassword));
+    }
 }

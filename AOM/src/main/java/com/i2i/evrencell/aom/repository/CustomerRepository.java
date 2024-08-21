@@ -46,21 +46,20 @@ public class CustomerRepository {
     private final CustomerPasswordEncoder customerPasswordEncoder;
     private final JWTService jwtService;
     private final TokenRepository tokenRepository;
-    private final AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager;
     private final VoltdbOperator voltdbOperator = new VoltdbOperator();
     
     public CustomerRepository(OracleConnection oracleConnection,
                               BalanceRepository balanceRepository,
                               CustomerPasswordEncoder customerPasswordEncoder,
                               JWTService jwtService,
-                              TokenRepository tokenRepository,
-                              AuthenticationManager authenticationManager) {
+                              TokenRepository tokenRepository
+                              ) {
         this.oracleConnection = oracleConnection;
         this.balanceRepository = balanceRepository;
         this.customerPasswordEncoder = customerPasswordEncoder;
         this.jwtService = jwtService;
         this.tokenRepository = tokenRepository;
-        this.authenticationManager = authenticationManager;
     }
 
     // ==ORACLE OPERATIONS==
@@ -129,7 +128,7 @@ public class CustomerRepository {
      * @throws SQLException
      * @throws ClassNotFoundException
      */
-    public AuthenticationResponse createUserInOracle(RegisterCustomerRequest registerCustomerRequest) throws SQLException, ClassNotFoundException {
+    public AuthenticationResponse createCustomerInOracle(RegisterCustomerRequest registerCustomerRequest) throws SQLException, ClassNotFoundException {
 
         logger.debug("Creating customer in Oracle DB");
         if (customerExists(registerCustomerRequest.msisdn(), registerCustomerRequest.email(), registerCustomerRequest.TCNumber())) {
@@ -184,6 +183,8 @@ public class CustomerRepository {
         stmt.close();
 
 
+
+
         CreateBalanceRequest createBalanceRequest = CreateBalanceRequest.builder()
                 .customerId(customerId)
                 .packageId(packageId)
@@ -191,7 +192,6 @@ public class CustomerRepository {
         balanceRepository.createOracleBalance(createBalanceRequest);
 
         User user = User.builder()
-                .userId(customerId)
                 .msisdn(registerCustomerRequest.msisdn())
                 .name(registerCustomerRequest.name())
                 .surname(registerCustomerRequest.surname())
@@ -201,6 +201,19 @@ public class CustomerRepository {
                 .sDate(new Timestamp(System.currentTimeMillis()))
                 .role(Role.USER)
                 .build();
+        saveUser(user);
+
+        Statement userStatement = connection.createStatement();
+        ResultSet resultSet = userStatement.executeQuery(OracleQueries.SELECT_USER_ID);
+        int userId = 0;
+        if (resultSet.next()) {
+            userId = resultSet.getInt(1);
+        }
+        user.setUserId(userId);
+        resultSet.close();
+        userStatement.close();
+
+
 
         String jwtToken = jwtService.generateToken(user);
         logger.debug("JWT Token generated successfully for customer: " + registerCustomerRequest.msisdn());
@@ -214,6 +227,39 @@ public class CustomerRepository {
                 .accessToken(jwtToken)
                 .refreshToken(refreshToken)
                 .build();
+    }
+
+    public void saveUser(User user) throws SQLException, ClassNotFoundException {
+        logger.debug("Saving user: " + user.getUserId());
+        Connection connection = null;
+        CallableStatement callableStatement = null;
+        try {
+            connection = oracleConnection.getOracleConnection();
+            callableStatement = connection.prepareCall("{call INSERT_USER(?, ?, ?, ?, ?, ?, ?, ?)}");
+            callableStatement.setString(1, user.getMsisdn());
+            callableStatement.setString(2, user.getName());
+            callableStatement.setString(3, user.getSurname());
+            callableStatement.setString(4, user.getEmail());
+            callableStatement.setString(5, user.getPassword());
+            callableStatement.setTimestamp(6, (Timestamp) user.getSDate());
+            callableStatement.setString(7, user.getTCNumber());
+            callableStatement.setString(8, user.getRole().name());
+            callableStatement.execute();
+        } catch (SQLException | ClassNotFoundException e) {
+            logger.error("Error while saving user: " + user, e);
+            throw e;
+        } finally {
+            try {
+                if (callableStatement != null) {
+                    callableStatement.close();
+                }
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                logger.error("Error while closing resources", e);
+            }
+        }
     }
 
     private void saveUserToken(User user, String jwtToken) {
@@ -242,10 +288,10 @@ public class CustomerRepository {
             resultSet = (ResultSet) callableStatement.getObject(2);
             if (resultSet.next()) {
                 User user = User.builder()
-                        .userId(resultSet.getInt("USER_ID"))
+                        .userId(resultSet.getInt("ID"))
                         .msisdn(resultSet.getString("MSISDN"))
-                        .name(resultSet.getString("NAME"))
-                        .surname(resultSet.getString("SURNAME"))
+                        .name(resultSet.getString("FIRST_NAME"))
+                        .surname(resultSet.getString("LAST_NAME"))
                         .email(resultSet.getString("EMAIL"))
                         .password(resultSet.getString("PASSWORD"))
                         .TCNumber(resultSet.getString("TC_NO"))
@@ -392,7 +438,7 @@ public class CustomerRepository {
      * @throws ProcCallException
      * @throws InterruptedException
      */
-    public ResponseEntity<String> createUserInVoltdb(RegisterCustomerRequest registerCustomerRequest) throws IOException, ProcCallException, InterruptedException {
+    public ResponseEntity<String> createCustomerInVoltDB(RegisterCustomerRequest registerCustomerRequest) throws IOException, ProcCallException, InterruptedException {
 
         logger.debug("Creating customer in VoltDB");
         int packageId = voltdbOperator.getPackageIdByName(registerCustomerRequest.packageName());
@@ -456,5 +502,18 @@ public class CustomerRepository {
         logger.debug("Customer exists in Oracle: " + ifCustomerExistsInOracle);
         return ifCustomerExistsInOracle;
 
+    }
+
+    public boolean isCustomerExistsByMsisdn(String msisdn) throws SQLException, ClassNotFoundException {
+        logger.debug("Checking if customer exists in VoltDB by MSISDN: " + msisdn);
+        Connection connection = oracleConnection.getOracleConnection();
+        CallableStatement callableStatement = connection.prepareCall("{call CHECK_CUSTOMER_EXISTS_BY_MSISDN(?, ?)}");
+        callableStatement.setString(1, msisdn);
+        callableStatement.registerOutParameter(2, Types.INTEGER);
+        callableStatement.execute();
+        int userExists = callableStatement.getInt(2);
+        callableStatement.close();
+        connection.close();
+        return userExists > 0;
     }
 }
