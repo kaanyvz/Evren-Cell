@@ -65,7 +65,7 @@ public class TokenRepository{
             resultSet = (ResultSet) callableStatement.getObject(2);
             if (resultSet.next()) {
                 Token token = Token.builder()
-                        .tokenId(resultSet.getInt("TOKEN_ID"))
+                        .tokenId(resultSet.getInt("ID"))
                         .token(resultSet.getString("TOKEN"))
                         .tokenType(TokenType.valueOf(resultSet.getString("TOKEN_TYPE")))
                         .expired(resultSet.getBoolean("EXPIRED"))
@@ -100,13 +100,12 @@ public class TokenRepository{
         CallableStatement callableStatement = null;
         try {
             connection = oracleConnection.getOracleConnection();
-            callableStatement = connection.prepareCall("{call INSERT_TOKEN(?, ?, ?, ?, ?, ?)}");
+            callableStatement = connection.prepareCall("{call INSERT_TOKEN(?, ?, ?, ?, ?)}");
             callableStatement.setString(1, token.getToken());
             callableStatement.setString(2, token.getTokenType().name());
-            callableStatement.setBoolean(3, token.isExpired());
-            callableStatement.setBoolean(4, token.isRevoked());
+            callableStatement.setString(3, token.isExpired() ? "Y" : "N");
+            callableStatement.setString(4, token.isRevoked() ? "Y" : "N");
             callableStatement.setInt(5, token.getUserId());
-            callableStatement.registerOutParameter(6, OracleTypes.CURSOR);
             callableStatement.execute();
         } catch (SQLException | ClassNotFoundException e) {
             logger.error("Error while adding token: " + token, e);
