@@ -29,14 +29,18 @@ public class TokenRepository{
         logger.debug("Finding all valid tokens by user id: " + userId);
         List<Token> tokens = new ArrayList<>();
         Connection connection = oracleConnection.getOracleConnection();
+
+        logger.debug("Finding all valid tokens by user id");
         CallableStatement callableStatement = connection.prepareCall("{call FIND_ALL_VALID_TOKENS_BY_USER(?, ?)}");
         callableStatement.setInt(1, userId);
         callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
+        logger.debug("executing...");
         callableStatement.execute();
+        logger.debug("worked...");
         ResultSet resultSet = (ResultSet) callableStatement.getObject(2);
         while (resultSet.next()) {
             Token token = Token.builder()
-                    .tokenId(resultSet.getInt("TOKEN_ID"))
+                    .tokenId(resultSet.getInt("ID"))
                     .token(resultSet.getString("TOKEN"))
                     .tokenType(TokenType.valueOf(resultSet.getString("TOKEN_TYPE")))
                     .expired(resultSet.getBoolean("EXPIRED"))
@@ -45,6 +49,7 @@ public class TokenRepository{
                     .build();
             tokens.add(token);
         }
+        logger.debug("Executed, closing connection");
         resultSet.close();
         callableStatement.close();
         connection.close();

@@ -4,6 +4,7 @@ import com.i2i.evrencell.aom.request.LoginCustomerRequest;
 import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
 import com.i2i.evrencell.aom.response.AuthenticationResponse;
 import com.i2i.evrencell.aom.service.AuthService;
+import com.i2i.evrencell.aom.service.LogoutService;
 import jakarta.validation.Valid;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -25,10 +26,13 @@ import java.sql.SQLException;
 @RequestMapping("/v1/api/auth")
 public class AuthController {
     private final AuthService authService;
+    private final LogoutService logoutService;
     private static final Logger logger = LogManager.getLogger(AuthController.class);
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService,
+                          LogoutService logoutService) {
         this.authService = authService;
+        this.logoutService = logoutService;
     }
 
     @PostMapping("/register")
@@ -39,9 +43,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ResponseEntity<String>> login(@RequestBody LoginCustomerRequest loginCustomerRequest) throws SQLException, ClassNotFoundException {
+    public ResponseEntity<AuthenticationResponse> login(@RequestBody LoginCustomerRequest loginCustomerRequest) throws SQLException, ClassNotFoundException {
         logger.debug("Request is taken, logging in customer");
-        return ResponseEntity.ok(authService.login(loginCustomerRequest));
+        return ResponseEntity.ok(authService.loginAuth(loginCustomerRequest));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(@RequestBody String token) {
+        logger.debug("Request is taken, logging out customer");
+        logoutService.logout(token);
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
+
 }
 

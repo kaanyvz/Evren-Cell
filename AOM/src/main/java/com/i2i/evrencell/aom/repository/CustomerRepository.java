@@ -301,7 +301,8 @@ public class CustomerRepository {
                 return Optional.of(user);
             }
         } catch (SQLException | ClassNotFoundException e) {
-            logger.error("Error while finding user by MSISDN: " + msisdn, e);
+            throw new NotFoundException("Customer not found by msisdn: " + msisdn);
+
         } finally {
             try {
                 if (resultSet != null) {
