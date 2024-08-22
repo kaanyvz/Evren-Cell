@@ -31,6 +31,9 @@ public class SecurityConfiguration {
             "/v1/api/forgetPassword/reset",
             "/swagger-resources/**",
             "/swagger-ui.html",
+            "/actuator/**",
+            "/api/v1/**",
+            "/metrics/**"
     };
     public SecurityConfiguration(JwtAuthenticationFilter jwtAuthenticationFilter,
                                  AuthenticationProvider authenticationProvider,

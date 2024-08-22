@@ -26,13 +26,11 @@ import java.sql.SQLException;
 @RequestMapping("/v1/api/auth")
 public class AuthController {
     private final AuthService authService;
-    private final LogoutService logoutService;
     private static final Logger logger = LogManager.getLogger(AuthController.class);
 
-    public AuthController(AuthService authService,
-                          LogoutService logoutService) {
+    public AuthController(AuthService authService
+    ) {
         this.authService = authService;
-        this.logoutService = logoutService;
     }
 
     @PostMapping("/register")
@@ -47,14 +45,6 @@ public class AuthController {
         logger.debug("Request is taken, logging in customer");
         return ResponseEntity.ok(authService.loginAuth(loginCustomerRequest));
     }
-
-    @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestBody String token) {
-        logger.debug("Request is taken, logging out customer");
-        logoutService.logout(token);
-        return ResponseEntity.ok("Logged out successfully");
-    }
-
 
 }
 

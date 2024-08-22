@@ -10,16 +10,16 @@ import java.sql.SQLException;
 @Component
 public class OracleConnection {
 
-    @Value("${spring.datasource.oracle.driver-class-name}")
+    @Value("${spring.datasource.driver-class-name}")
     private String databaseDriver;
 
-    @Value("${spring.datasource.oracle.url}")
+    @Value("${spring.datasource.url}")
     private String connectionString;
 
-    @Value("${spring.datasource.oracle.username}")
+    @Value("${spring.datasource.username}")
     private String userName;
 
-    @Value("${spring.datasource.oracle.password}")
+    @Value("${spring.datasource.password}")
     private String password;
 
     public Connection getOracleConnection() throws ClassNotFoundException, SQLException {
