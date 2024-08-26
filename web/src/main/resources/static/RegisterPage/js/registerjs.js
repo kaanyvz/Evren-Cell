@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function() {
     const packageSelect = document.getElementById("package");
 
-    fetch("http://35.242.205.201/v1/api/packages/getAllPackages")
+    fetch("http://localhost:8080/v1/api/packages/getAllPackages")
         .then(response => {
             if (!response.ok) {
                 throw new Error("Network response was not ok");
@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 
-        fetch('http://35.242.205.201/v1/api/auth/register', {
+        fetch('http://localhost:8080/v1/api/auth/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -52,10 +52,11 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.statusCodeValue == 200) {
+            if (data.access_token) {
                 alert('Kayıt BAŞARILI!!!');
                 window.location.href = `/src/main/resources/static/LoginPage/index.html`;
             } else {
+                console.log(data);
                 alert('KAYIT BAŞARISIZ: ' + data.message);
             }
         })

@@ -1,55 +1,59 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const msisdn = localStorage.getItem('msisdn');
-    console.log(msisdn);
-
-    if (!msisdn) {
-        alert('No MSISDN found. Please log in again.');
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        alert('No access token found. Please log in again.');
         window.location.href = 'login.html';
         return;
     }
 
-   
-    fetch(`http://35.242.205.201/v1/api/packages/getUserPackageByMsisdn?msisdn=${'90'+msisdn}`)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const msisdn = payload.sub;
+    console.log(msisdn);
+
+    fetch(`http://localhost:8080/v1/api/packages/getUserPackageByMsisdn?msisdn=${msisdn}`,{
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+    })
         .then(response => response.json())
         .then(packageData => {
             const totalData = packageData.amountData;
             const totalMinutes = packageData.amountMinutes;
             const totalSms = packageData.amountSms;
-            const packageName =packageData.packageName;
-            console.log(packageData)
+            const packageName = packageData.packageName;
+            console.log(packageData);
 
-            document.getElementById('packagename').textContent=packageName;
+            document.getElementById('packagename').textContent = packageName;
 
-            
-            fetch(`http://35.242.205.201/v1/api/balance/remainingBalance?msisdn=${'90'+msisdn}`)
+            fetch(`http://localhost:8080/v1/api/balance/remainingBalance?msisdn=${msisdn}`,{
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
                 .then(response => response.json())
                 .then(balanceData => {
                     const remainingData = balanceData.balanceData;
                     const remainingMinutes = balanceData.balanceMinutes;
                     const remainingSms = balanceData.balanceSms;
-                    const remainingDays=balanceData.edate;
-                    console.log(balanceData)
+                    const remainingDays = balanceData.edate;
+                    console.log(balanceData);
 
-                    const dateObject=new Date(remainingDays);
-
-                    const day=dateObject.getDate();
-                    const month = dateObject.getMonth()+1;
-                    const year =dateObject.getFullYear();
+                    const dateObject = new Date(remainingDays);
+                    const day = dateObject.getDate();
+                    const month = dateObject.getMonth() + 1;
+                    const year = dateObject.getFullYear();
                     const formattedDate = `${day}/${month}/${year}`;
 
-                    
                     const dataPercentage = ((remainingData / totalData) * 100).toFixed(1);
                     const minutesPercentage = ((remainingMinutes / totalMinutes) * 100).toFixed(1);
                     const smsPercentage = ((remainingSms / totalSms) * 100).toFixed(1);
 
-                    
-
-                    document.getElementById('data-info').textContent=remainingData+"/"+totalData;
-                    document.getElementById('minute-info').textContent=remainingMinutes+"/"+totalMinutes;
-                    document.getElementById('sms-info').textContent=remainingSms+"/"+totalSms;
-                    document.getElementById('day-info1').textContent=formattedDate;
-                    document.getElementById('day-info2').textContent=formattedDate;
-                    document.getElementById('day-info3').textContent=formattedDate;
+                    document.getElementById('data-info').textContent = `${remainingData}/${totalData}`;
+                    document.getElementById('minute-info').textContent = `${remainingMinutes}/${totalMinutes}`;
+                    document.getElementById('sms-info').textContent = `${remainingSms}/${totalSms}`;
+                    document.getElementById('day-info1').textContent = formattedDate;
+                    document.getElementById('day-info2').textContent = formattedDate;
+                    document.getElementById('day-info3').textContent = formattedDate;
 
                     updateCircle('#circle1', dataPercentage);
                     updateCircle('#circle2', minutesPercentage);

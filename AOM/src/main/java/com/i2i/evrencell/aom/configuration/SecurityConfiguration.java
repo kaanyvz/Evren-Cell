@@ -33,7 +33,8 @@ public class SecurityConfiguration {
             "/swagger-ui.html",
             "/actuator/**",
             "/api/v1/**",
-            "/metrics/**"
+            "/metrics/**",
+            "v1/api/packages/getAllPackages"
     };
     public SecurityConfiguration(JwtAuthenticationFilter jwtAuthenticationFilter,
                                  AuthenticationProvider authenticationProvider,
