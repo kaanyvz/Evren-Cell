@@ -242,6 +242,7 @@ public class Login extends JFrame {
         }
     }
 
+    // Store the access token after successful authentication
     private boolean authenticateUser(String phone, String password) {
         try {
             URL url = new URL(urlPathLogin);
@@ -274,16 +275,20 @@ public class Login extends JFrame {
                     responseMessage = response.toString();
                     // Parse JSON response
                     JSONObject jsonResponse = new JSONObject(responseMessage);
-                    String statusCode = jsonResponse.optString("statusCode", "Unknown");
-                    System.out.println("Status code: " + statusCode); // Print status code
+                    String accessToken = jsonResponse.optString("access_token", null);
+                    String refreshToken = jsonResponse.optString("refresh_token", null);
 
-                    if ("OK".equals(statusCode)) {
-                        MainFrame mainFrame = new MainFrame(phone);
+                    if (accessToken != null && refreshToken != null) {
+                        // Store tokens (you can store them in a secure place)
+                        System.out.println("Access Token: " + accessToken);
+                        System.out.println("Refresh Token: " + refreshToken);
+
+                        MainFrame mainFrame = new MainFrame(phone, accessToken);
                         mainFrame.setVisible(true);
                         dispose();
                         return true; // Successful authentication
                     } else {
-                        JOptionPane.showMessageDialog(null, "Wrong information.", "Authentication Failed", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(null, "Authentication failed.", "Authentication Failed", JOptionPane.ERROR_MESSAGE);
                         textFieldPhone.setText("");
                         passwordField.setText("");
                         return false; // Authentication failed
@@ -303,11 +308,6 @@ public class Login extends JFrame {
                     responseMessage = response.toString();
                     System.out.println("Error response: " + responseMessage);
 
-                    // Parse JSON response
-                    JSONObject jsonResponse = new JSONObject(responseMessage);
-                    String statusCode = jsonResponse.optString("statusCode", "Unknown");
-                    System.out.println("Status code: " + statusCode); // Print status code
-
                     return false; // Authentication failed
                 } catch (IOException e) {
                     responseMessage = "Error reading error stream: " + e.getMessage();
@@ -317,7 +317,6 @@ public class Login extends JFrame {
             }
         } catch (Exception e) {
             e.printStackTrace();
-
             return false;
         }
     }
