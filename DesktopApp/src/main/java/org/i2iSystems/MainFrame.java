@@ -34,6 +34,7 @@ public class MainFrame extends JFrame {
 
 
     private static String phone;
+    private String accessToken;
     private String textType = ConfigLoader.getProperty("textType");
     private String gifPath = ConfigLoader.getProperty("gifPath");
     private String logoPath = ConfigLoader.getProperty("logoPath");
@@ -47,21 +48,22 @@ public class MainFrame extends JFrame {
     private int secondRatio;
     private int thirdRatio;
 
-        // Timer to refresh the frame every 1 second
+    // Timer to refresh the frame every 1 second
     private Timer refreshTimer;
 
-    public static void main(String[] args) {
-        EventQueue.invokeLater(() -> {
-            try {
-                MainFrame frame = new MainFrame(phone);
-                frame.setVisible(true);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
+//    public static void main(String[] args) {
+//        EventQueue.invokeLater(() -> {
+//            try {
+//                MainFrame frame = new MainFrame(phone);
+//                frame.setVisible(true);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        });
+//    }
 
-    public MainFrame(String phone) {
+    public MainFrame(String phone, String accessToken) {
+        this.accessToken = accessToken;
         this.phone = phone;
         textField1 = new JTextField();
         textField2 = new JTextField();
@@ -90,10 +92,10 @@ public class MainFrame extends JFrame {
         setBounds(100, 100, 885, 698);
         contentPane = new JPanel() {
             /**
-			 *
-			 */
-			private static final long serialVersionUID = 1L;
-			private Image backgroundImage;
+             *
+             */
+            private static final long serialVersionUID = 1L;
+            private Image backgroundImage;
 
             @Override
             protected void paintComponent(Graphics g) {
@@ -115,7 +117,7 @@ public class MainFrame extends JFrame {
         btnLogOut.setBorder(null);
         btnLogOut.setBounds(735, 25, 106, 40);
         btnLogOut.addActionListener(e -> {
-        	clearFileContent(InfoPath);
+            clearFileContent(InfoPath);
             Login log = new Login();
             log.setVisible(true);
             dispose();
@@ -263,7 +265,7 @@ public class MainFrame extends JFrame {
         drawingPanel7.setLayout(null);
         contentPane.add(drawingPanel7);
 
-      //---------------------------------------------------------------------------------- Minute end date
+        //---------------------------------------------------------------------------------- Minute end date
 
         textField8.setRequestFocusEnabled(false);
         textField8.setEditable(false);
@@ -353,6 +355,7 @@ public class MainFrame extends JFrame {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("Authorization", "Bearer " + accessToken);
 
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             String inputLine;
@@ -407,92 +410,93 @@ public class MainFrame extends JFrame {
         }
     }
     public static String removePercentageSign(String text) {
-    if (text == null) {
-        return null;
+        if (text == null) {
+            return null;
+        }
+
+        // Replace commas with dots for float parsing
+        text = text.replace(',', '.');
+
+        // Remove `%` sign if present
+        if (text.startsWith("%")) {
+            return text.substring(1);
+        }
+
+        return text;
     }
-
-    // Replace commas with dots for float parsing
-    text = text.replace(',', '.');
-
-    // Remove `%` sign if present
-    if (text.startsWith("%")) {
-        return text.substring(1);
-    }
-
-    return text;
-}
 
     public float calculateRatio(float left, float tam) {
         return  (left / tam) * 100;
     }
     public void CalculateAllRemastered(int mod, int left) {
-    try {
-        String urlString = urlPathRemain + phone;
-        URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("accept", "*/*");
+        try {
+            String urlString = urlPathRemain + phone;
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("Authorization", "Bearer " + accessToken);
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        StringBuilder response = new StringBuilder();
-        String inputLine;
-        while ((inputLine = in.readLine()) != null) {
-            response.append(inputLine);
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+
+            JSONObject jsonResponse = new JSONObject(response.toString());
+            String packageName = jsonResponse.getString("packageName");
+
+            int amountMinutes = jsonResponse.getInt("amountMinutes");
+            int amountData = jsonResponse.getInt("amountData");
+            int amountSms = jsonResponse.getInt("amountSms");
+
+            int dataRatio = (int)calculateRatio(left,amountData);
+            int minuteRatio = (int)calculateRatio(left,amountMinutes);
+            int smsRatio = (int)calculateRatio(left, amountSms);
+
+            float dataRatio11 = calculateRatio(left,amountData);
+            float dataRatio22 = calculateRatio(left,amountMinutes);
+            float dataRatio33 = calculateRatio(left,amountSms);
+
+            // Format to keep only the first digit after the decimal point
+            String strDataRatio11 = String.format("%.1f", dataRatio11);
+            String strDataRatio22 = String.format("%.1f", dataRatio22);
+            String strDataRatio33 = String.format("%.1f", dataRatio33);
+
+            if (mod == 1) { // Data
+                if(dataRatio == 100){
+                    textField1.setText("%"+String.valueOf(dataRatio));
+                }
+                else{
+                    textField1.setText("%"+strDataRatio11);
+                }
+            } else if (mod == 2) { // Minute
+                if(minuteRatio == 100){
+                    textField2.setText("%"+String.valueOf(minuteRatio));
+                }
+                else{
+                    textField2.setText("%"+strDataRatio22);
+                }
+
+            } else if (mod == 3) { // SMS
+                if(smsRatio == 100){
+                    textField3.setText("%"+String.valueOf(smsRatio));
+                }
+                else{
+                    textField3.setText("%"+strDataRatio33);
+                }
+
+            }
+            textField10.setText(packageName);
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        in.close();
 
-        JSONObject jsonResponse = new JSONObject(response.toString());
-        String packageName = jsonResponse.getString("packageName");
-
-        int amountMinutes = jsonResponse.getInt("amountMinutes");
-        int amountData = jsonResponse.getInt("amountData");
-        int amountSms = jsonResponse.getInt("amountSms");
-
-        int dataRatio = (int)calculateRatio(left,amountData);
-        int minuteRatio = (int)calculateRatio(left,amountMinutes);
-        int smsRatio = (int)calculateRatio(left, amountSms);
-
-        float dataRatio11 = calculateRatio(left,amountData);
-        float dataRatio22 = calculateRatio(left,amountMinutes);
-        float dataRatio33 = calculateRatio(left,amountSms);
-
-        // Format to keep only the first digit after the decimal point
-        String strDataRatio11 = String.format("%.1f", dataRatio11);
-        String strDataRatio22 = String.format("%.1f", dataRatio22);
-        String strDataRatio33 = String.format("%.1f", dataRatio33);
-
-        if (mod == 1) { // Data
-            if(dataRatio == 100){
-                textField1.setText("%"+String.valueOf(dataRatio));
-            }
-            else{
-                textField1.setText("%"+strDataRatio11);
-            }
-        } else if (mod == 2) { // Minute
-            if(minuteRatio == 100){
-                textField2.setText("%"+String.valueOf(minuteRatio));
-            }
-            else{
-                textField2.setText("%"+strDataRatio22);
-            }
-
-        } else if (mod == 3) { // SMS
-            if(smsRatio == 100){
-                textField3.setText("%"+String.valueOf(smsRatio));
-            }
-            else{
-                textField3.setText("%"+strDataRatio33);
-            }
-
-        }
-        textField10.setText(packageName);
-
-
-    } catch (Exception e) {
-        e.printStackTrace();
     }
-
-}
     public int fetchPackageDetails4int(String phoneNumber, String mod) {
         String urlString = urlPathRemain + phoneNumber;
         int result = 0;
@@ -502,6 +506,7 @@ public class MainFrame extends JFrame {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("Authorization", "Bearer " + accessToken);
 
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             String inputLine;
@@ -628,5 +633,3 @@ class RoundedPanel extends JPanel {
         g2d.fillArc(x, y, diameter, diameter, 90, angle); // Start at the top of the circle
     }
 }
-
-
