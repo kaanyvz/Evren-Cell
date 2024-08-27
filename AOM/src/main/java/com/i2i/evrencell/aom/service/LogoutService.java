@@ -3,12 +3,15 @@ package com.i2i.evrencell.aom.service;
 import com.i2i.evrencell.aom.repository.TokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.stereotype.Service;
 
 @Service
 public class LogoutService implements LogoutHandler {
+    private static final Logger logger  = LoggerFactory.getLogger(LogoutService.class);
     private final TokenRepository tokenRepository;
 
     public LogoutService(TokenRepository tokenRepository) {
@@ -20,6 +23,7 @@ public class LogoutService implements LogoutHandler {
                        HttpServletResponse response,
                        Authentication authentication) {
 
+        logger.debug("Logging out user");
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -37,5 +41,6 @@ public class LogoutService implements LogoutHandler {
                 e.printStackTrace();
             }
         }
+        logger.debug("User logged out successfully");
     }
 }

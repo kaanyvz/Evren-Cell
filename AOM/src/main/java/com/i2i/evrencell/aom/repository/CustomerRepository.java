@@ -15,8 +15,8 @@ import com.i2i.evrencell.aom.response.AuthenticationResponse;
 import com.i2i.evrencell.aom.service.JWTService;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
 import oracle.jdbc.OracleTypes;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.stereotype.Repository;
@@ -40,7 +40,7 @@ import java.util.Optional;
  */
 @Repository
 public class CustomerRepository {
-    private static final Logger logger = LogManager.getLogger(CustomerRepository.class);
+    private static final Logger logger = LoggerFactory.getLogger(CustomerRepository.class);
     private final OracleConnection oracleConnection;
     private final BalanceRepository balanceRepository;
     private final CustomerPasswordEncoder customerPasswordEncoder;

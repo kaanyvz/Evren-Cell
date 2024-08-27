@@ -7,8 +7,8 @@ import com.i2i.evrencell.aom.request.ForgetPasswordRequest;
 import jakarta.mail.MessagingException;
 import jakarta.mail.SendFailedException;
 import jakarta.mail.internet.MimeMessage;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -26,7 +26,7 @@ import java.sql.Types;
 
 @Service
 public class ForgetPasswordService {
-    private static final Logger logger = LogManager.getLogger(ForgetPasswordService.class);
+    private static final Logger logger = LoggerFactory.getLogger(ForgetPasswordService.class);
     private final CustomerRepository customerRepository;
     private final CustomerPasswordEncoder customerPasswordEncoder;
     private final JavaMailSender javaMailSender;

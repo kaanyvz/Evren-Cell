@@ -12,9 +12,9 @@ import com.i2i.evrencell.aom.request.RegisterCustomerRequest;
 import com.i2i.evrencell.aom.response.AuthenticationResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.i2i.hazelcast.utils.HazelcastMWOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +30,7 @@ import java.sql.SQLException;
 @Service
 public class AuthService {
 
-    private static final Logger logger = LogManager.getLogger("DebugLog");
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final CustomerRepository customerRepository;
     private final CustomerPasswordEncoder customerPasswordEncoder;

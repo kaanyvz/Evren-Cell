@@ -4,8 +4,8 @@ import com.i2i.evrencell.aom.enumeration.TokenType;
 import com.i2i.evrencell.aom.helper.OracleConnection;
 import com.i2i.evrencell.aom.model.Token;
 import oracle.jdbc.OracleTypes;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import java.sql.CallableStatement;
@@ -18,7 +18,7 @@ import java.util.Optional;
 
 @Repository
 public class TokenRepository{
-    private static final Logger logger = LogManager.getLogger(TokenRepository.class);
+    private static final Logger logger = LoggerFactory.getLogger(TokenRepository.class);
     private final OracleConnection oracleConnection;
 
     public TokenRepository(OracleConnection oracleConnection) {
