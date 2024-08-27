@@ -5,8 +5,8 @@ import com.i2i.evrencell.aom.exception.NotFoundException;
 import com.i2i.evrencell.aom.helper.OracleConnection;
 import com.i2i.evrencell.voltdb.VoltPackage;
 import oracle.jdbc.OracleTypes;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
 import org.voltdb.client.ProcCallException;
@@ -25,7 +25,7 @@ import java.util.Optional;
 public class PackageRepository {
     private final OracleConnection oracleConnection;
     private final VoltdbOperator voltdbOperator = new VoltdbOperator();
-    private static final Logger logger = LogManager.getLogger(PackageRepository.class);
+    private static final Logger logger = LoggerFactory.getLogger(PackageRepository.class);
 
     public PackageRepository(OracleConnection oracleConnection) {
         this.oracleConnection = oracleConnection;

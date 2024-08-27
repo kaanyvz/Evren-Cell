@@ -5,8 +5,8 @@ import com.i2i.evrencell.aom.dto.PackageDto;
 import com.i2i.evrencell.aom.mapper.PackageMapper;
 import com.i2i.evrencell.aom.repository.PackageRepository;
 import com.i2i.evrencell.voltdb.VoltPackage;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.voltdb.client.ProcCallException;
 
@@ -19,7 +19,7 @@ import java.util.Optional;
 public class PackageService {
     private final PackageRepository packageRepository;
     private final PackageMapper packageMapper;
-    private static final Logger logger = LogManager.getLogger(PackageService.class);
+    private static final Logger logger = LoggerFactory.getLogger(PackageService.class);
 
     public PackageService(PackageRepository packageRepository,
                           PackageMapper packageMapper) {

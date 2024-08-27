@@ -5,8 +5,8 @@ import com.i2i.evrencell.aom.mapper.CustomerMapper;
 import com.i2i.evrencell.aom.repository.CustomerRepository;
 import com.i2i.evrencell.voltdb.VoltCustomer;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.voltdb.client.ProcCallException;
 
@@ -16,10 +16,10 @@ import java.util.List;
 
 @Service
 public class CustomerService {
+    private static final Logger logger = LoggerFactory.getLogger(CustomerService.class);
     private final CustomerRepository customerRepository;
     private final CustomerMapper customerMapper;
     private final VoltdbOperator voltdbOperator = new VoltdbOperator();
-    private static final Logger logger = LogManager.getLogger(CustomerService.class);
 
     public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper) {
         this.customerRepository = customerRepository;

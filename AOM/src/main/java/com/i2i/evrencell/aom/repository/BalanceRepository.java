@@ -5,8 +5,8 @@ import com.i2i.evrencell.aom.helper.OracleConnection;
 import com.i2i.evrencell.aom.request.CreateBalanceRequest;
 import com.i2i.evrencell.voltdb.VoltPackageDetails;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Repository;
@@ -23,7 +23,7 @@ import java.sql.Types;
 public class BalanceRepository {
     private final OracleConnection oracleConnection;
     private final VoltdbOperator voltdbOperator = new VoltdbOperator();
-    private final Logger logger = LogManager.getLogger(BalanceRepository.class);
+    private final Logger logger = LoggerFactory.getLogger(BalanceRepository.class);
 
     public BalanceRepository(OracleConnection oracleConnection) {
         this.oracleConnection = oracleConnection;
@@ -40,9 +40,9 @@ public class BalanceRepository {
      * @throws SQLException
      */
     public ResponseEntity<String> createOracleBalance(CreateBalanceRequest createBalanceRequest) throws ClassNotFoundException, SQLException {
-        logger.debug("Creating balance for customer with packageId: " + createBalanceRequest.packageId());
-        logger.debug("Creating balance for customer with customerId: " + createBalanceRequest.customerId());
-        logger.debug("Creating balance for customer with packageId: " + createBalanceRequest.packageId());
+        logger.debug("Creating balance for customer with balanceId: {}", createBalanceRequest.balanceId());
+        logger.debug("Creating balance for customer with customerId: {}",  createBalanceRequest.customerId());
+        logger.debug("Creating balance for customer with packageId: {}",  createBalanceRequest.packageId());
 
         logger.debug("Connecting to OracleDb");
         Connection connection = oracleConnection.getOracleConnection();
@@ -110,7 +110,7 @@ public class BalanceRepository {
      */
     public ResponseEntity<String> createVoltBalance(CreateBalanceRequest createBalanceRequest) throws IOException, ProcCallException, InterruptedException {
 
-        logger.debug("Creating balance for customer with packageId: " + createBalanceRequest.packageId());
+        logger.debug("Creating balance for customer with balanceId: " + createBalanceRequest.balanceId());
         logger.debug("Creating balance for customer with customerId: " + createBalanceRequest.customerId());
         logger.debug("Creating balance for customer with packageId: " + createBalanceRequest.packageId());
         VoltPackageDetails voltPackageDetails = voltdbOperator.getPackageInfoByPackageId(createBalanceRequest.packageId());
