@@ -19,11 +19,14 @@ public class CustomerService {
     private static final Logger logger = LoggerFactory.getLogger(CustomerService.class);
     private final CustomerRepository customerRepository;
     private final CustomerMapper customerMapper;
-    private final VoltdbOperator voltdbOperator = new VoltdbOperator();
+    private final VoltdbOperator voltdbOperator;
 
-    public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper) {
+    public CustomerService(CustomerRepository customerRepository,
+                           CustomerMapper customerMapper,
+                           VoltdbOperator voltdbOperator) {
         this.customerRepository = customerRepository;
         this.customerMapper = customerMapper;
+        this.voltdbOperator = voltdbOperator;
     }
 
     /**

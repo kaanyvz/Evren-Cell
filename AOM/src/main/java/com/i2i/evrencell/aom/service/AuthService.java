@@ -1,7 +1,6 @@
 package com.i2i.evrencell.aom.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.i2i.evrencell.aom.encryption.CustomerPasswordEncoder;
 import com.i2i.evrencell.aom.enumeration.TokenType;
 import com.i2i.evrencell.aom.model.Token;
 import com.i2i.evrencell.aom.model.User;
@@ -16,7 +15,6 @@ import org.i2i.hazelcast.utils.HazelcastMWOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,24 +31,21 @@ public class AuthService {
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final CustomerRepository customerRepository;
-    private final CustomerPasswordEncoder customerPasswordEncoder;
     private final TokenRepository tokenRepository;
     private final JWTService jwtService;
     private final AuthenticationManager authenticationManager;
 
     public AuthService(CustomerRepository customerRepository,
-                       CustomerPasswordEncoder customerPasswordEncoder,
                        TokenRepository tokenRepository,
                        JWTService jwtService,
                        AuthenticationManager authenticationManager) {
         this.customerRepository = customerRepository;
-        this.customerPasswordEncoder = customerPasswordEncoder;
         this.tokenRepository = tokenRepository;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
     }
 
-    //todo - generate token while registering user (test it)
+
     public AuthenticationResponse registerCustomer(RegisterCustomerRequest registerCustomerRequest) throws SQLException,
             ClassNotFoundException, IOException, ProcCallException, InterruptedException {
 
@@ -67,25 +62,6 @@ public class AuthService {
         logger.debug("Successfully registered customer in Oracle, VoltDB, and Hazelcast for MSISDN: " + registerCustomerRequest.msisdn());
 
         return authenticationResponse;
-    }
-
-    //todo - generate token while logging in user (test it)
-    public ResponseEntity<String> login(LoginCustomerRequest loginCustomerRequest) throws SQLException, ClassNotFoundException {
-        logger.debug("Attempting login for MSISDN: " + loginCustomerRequest.msisdn());
-        String encodedPassword = customerRepository.getEncodedCustomerPasswordByMsisdn(loginCustomerRequest.msisdn());
-        if (encodedPassword == null) {
-            logger.debug("Invalid credentials for MSISDN: " + loginCustomerRequest.msisdn());
-            return new ResponseEntity<>("Invalid credentials", HttpStatus.UNAUTHORIZED);
-        }
-        String decodedPassword = customerPasswordEncoder.decrypt(encodedPassword);
-        boolean isPasswordMatch = loginCustomerRequest.password().equals(decodedPassword);
-        if (isPasswordMatch) {
-            logger.debug("Login successful for MSISDN: " + loginCustomerRequest.msisdn());
-            return ResponseEntity.ok("Login successful");
-        } else {
-            logger.warn("Invalid credentials for MSISDN: " + loginCustomerRequest.msisdn());
-            return new ResponseEntity<>("Invalid credentials", HttpStatus.UNAUTHORIZED);
-        }
     }
 
     public AuthenticationResponse loginAuth(LoginCustomerRequest request) throws SQLException, ClassNotFoundException {
@@ -139,10 +115,6 @@ public class AuthService {
         });
     }
 
-    private boolean isCustomerAlreadyExistsInSystemByMsisdn(String msisdn) throws SQLException, ClassNotFoundException {
-        return customerRepository.isCustomerExistsByMsisdn(msisdn);
-    }
-
     private void saveUserToken(User user, String jwtToken) {
 
         var token = Token
@@ -155,11 +127,6 @@ public class AuthService {
                 .build();
         tokenRepository.addToken(token);
     }
-
-
-
-
-
 }
 
 

@@ -80,7 +80,7 @@ public class JWTService {
                 .compact();
     }
 
-    private boolean isTokenExpired(String token) {
+    boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
@@ -88,7 +88,7 @@ public class JWTService {
         return extractClaim(token, Claims::getExpiration);
     }
 
-    private Key getSignInKey(){
+    Key getSignInKey(){
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }
