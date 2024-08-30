@@ -25,19 +25,35 @@ public class TokenRepository{
         this.oracleConnection = oracleConnection;
     }
 
+    /*START FIND ALL VALID TOKENS*/
     public List<Token> findAllValidTokensByUser(Integer userId) throws SQLException, ClassNotFoundException {
         logger.debug("Finding all valid tokens by user id: " + userId);
-        List<Token> tokens = new ArrayList<>();
         Connection connection = oracleConnection.getOracleConnection();
+        CallableStatement callableStatement = null;
+        ResultSet resultSet = null;
 
-        logger.debug("Finding all valid tokens by user id");
+        try {
+            callableStatement = prepareFindAllValidTokensByUserStatement(connection, userId);
+            resultSet = executeFindAllValidTokensByUser(callableStatement);
+            return mapTokensFromResultSet(resultSet);
+        } finally {
+            closeResources(resultSet, callableStatement, connection);
+        }
+    }
+    private CallableStatement prepareFindAllValidTokensByUserStatement(Connection connection, Integer userId) throws SQLException {
+        logger.debug("Preparing SQL statement to find all valid tokens by user id");
         CallableStatement callableStatement = connection.prepareCall("{call FIND_ALL_VALID_TOKENS_BY_USER(?, ?)}");
         callableStatement.setInt(1, userId);
         callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
-        logger.debug("executing...");
+        return callableStatement;
+    }
+    private ResultSet executeFindAllValidTokensByUser(CallableStatement callableStatement) throws SQLException {
+        logger.debug("Executing SQL statement to find all valid tokens by user id");
         callableStatement.execute();
-        logger.debug("worked...");
-        ResultSet resultSet = (ResultSet) callableStatement.getObject(2);
+        return (ResultSet) callableStatement.getObject(2);
+    }
+    private List<Token> mapTokensFromResultSet(ResultSet resultSet) throws SQLException {
+        List<Token> tokens = new ArrayList<>();
         while (resultSet.next()) {
             Token token = Token.builder()
                     .tokenId(resultSet.getInt("ID"))
@@ -49,109 +65,133 @@ public class TokenRepository{
                     .build();
             tokens.add(token);
         }
-        logger.debug("Executed, closing connection");
-        resultSet.close();
-        callableStatement.close();
-        connection.close();
         return tokens;
     }
+    /*END FIND ALL VALID TOKENS*/
 
-    public Optional<Token> findByToken(String tokenValue){
+    /*START FIND BY TOKEN*/
+    public Optional<Token> findByToken(String tokenValue) {
         logger.debug("Finding token by token value: " + tokenValue);
         Connection connection = null;
         CallableStatement callableStatement = null;
         ResultSet resultSet = null;
+
         try {
             connection = oracleConnection.getOracleConnection();
-            callableStatement = connection.prepareCall("{call FIND_TOKEN_BY_VALUE(?, ?)}");
-            callableStatement.setString(1, tokenValue);
-            callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
-            callableStatement.execute();
-            resultSet = (ResultSet) callableStatement.getObject(2);
-            if (resultSet.next()) {
-                Token token = Token.builder()
-                        .tokenId(resultSet.getInt("ID"))
-                        .token(resultSet.getString("TOKEN"))
-                        .tokenType(TokenType.valueOf(resultSet.getString("TOKEN_TYPE")))
-                        .expired(resultSet.getBoolean("EXPIRED"))
-                        .revoked(resultSet.getBoolean("REVOKED"))
-                        .userId(resultSet.getInt("USER_ID"))
-                        .build();
-                return Optional.of(token);
-            }
+            callableStatement = prepareFindByTokenStatement(connection, tokenValue);
+            resultSet = executeFindByToken(callableStatement);
+            return mapTokenFromResultSet(resultSet);
         } catch (SQLException | ClassNotFoundException e) {
             logger.error("Error while finding token by token value: " + tokenValue, e);
         } finally {
-            try {
-                if (resultSet != null) {
-                    resultSet.close();
-                }
-                if (callableStatement != null) {
-                    callableStatement.close();
-                }
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logger.error("Error while closing resources", e);
-            }
+            closeResources(resultSet, callableStatement, connection);
         }
         return Optional.empty();
     }
+    private CallableStatement prepareFindByTokenStatement(Connection connection, String tokenValue) throws SQLException {
+        logger.debug("Preparing SQL statement to find token by token value");
+        CallableStatement callableStatement = connection.prepareCall("{call FIND_TOKEN_BY_VALUE(?, ?)}");
+        callableStatement.setString(1, tokenValue);
+        callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
+        return callableStatement;
+    }
+    private ResultSet executeFindByToken(CallableStatement callableStatement) throws SQLException {
+        logger.debug("Executing SQL statement to find token by token value");
+        callableStatement.execute();
+        return (ResultSet) callableStatement.getObject(2);
+    }
+    private Optional<Token> mapTokenFromResultSet(ResultSet resultSet) throws SQLException {
+        if (resultSet.next()) {
+            Token token = Token.builder()
+                    .tokenId(resultSet.getInt("ID"))
+                    .token(resultSet.getString("TOKEN"))
+                    .tokenType(TokenType.valueOf(resultSet.getString("TOKEN_TYPE")))
+                    .expired(resultSet.getBoolean("EXPIRED"))
+                    .revoked(resultSet.getBoolean("REVOKED"))
+                    .userId(resultSet.getInt("USER_ID"))
+                    .build();
+            return Optional.of(token);
+        }
+        return Optional.empty();
+    }
+    /*END FIND BY TOKEN*/
 
-    public void addToken(Token token){
+
+    /*START ADD TOKEN*/
+    public void addToken(Token token) {
         logger.debug("Adding token: " + token);
         Connection connection = null;
         CallableStatement callableStatement = null;
+
         try {
             connection = oracleConnection.getOracleConnection();
-            callableStatement = connection.prepareCall("{call INSERT_TOKEN(?, ?, ?, ?, ?)}");
-            callableStatement.setString(1, token.getToken());
-            callableStatement.setString(2, token.getTokenType().name());
-            callableStatement.setString(3, token.isExpired() ? "Y" : "N");
-            callableStatement.setString(4, token.isRevoked() ? "Y" : "N");
-            callableStatement.setInt(5, token.getUserId());
-            callableStatement.execute();
+            callableStatement = prepareAddTokenStatement(connection, token);
+            executeAddToken(callableStatement);
         } catch (SQLException | ClassNotFoundException e) {
             logger.error("Error while adding token: " + token, e);
         } finally {
-            try {
-                if (callableStatement != null) {
-                    callableStatement.close();
-                }
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logger.error("Error while closing resources", e);
-            }
+            closeResources(null, callableStatement, connection);
         }
     }
+    private CallableStatement prepareAddTokenStatement(Connection connection, Token token) throws SQLException {
+        logger.debug("Preparing SQL statement to add token");
+        CallableStatement callableStatement = connection.prepareCall("{call INSERT_TOKEN(?, ?, ?, ?, ?)}");
+        callableStatement.setString(1, token.getToken());
+        callableStatement.setString(2, token.getTokenType().name());
+        callableStatement.setString(3, token.isExpired() ? "Y" : "N");
+        callableStatement.setString(4, token.isRevoked() ? "Y" : "N");
+        callableStatement.setInt(5, token.getUserId());
+        return callableStatement;
+    }
+    private void executeAddToken(CallableStatement callableStatement) throws SQLException {
+        logger.debug("Executing SQL statement to add token");
+        callableStatement.execute();
+    }
+    /*END ADD TOKEN*/
 
-    public void updateTokenStatus(Token token){
+    /*START UPDATE TOKEN*/
+    public void updateTokenStatus(Token token) {
         logger.debug("Updating token status: " + token);
         Connection connection = null;
         CallableStatement callableStatement = null;
+
         try {
             connection = oracleConnection.getOracleConnection();
-            callableStatement = connection.prepareCall("{call UPDATE_TOKEN_STATUS(?, ?, ?)}");
-            callableStatement.setInt(1, token.getTokenId());
-            callableStatement.setString(2, token.isExpired() ? "Y" : "N");
-            callableStatement.setString(3, token.isRevoked() ? "Y" : "N");
-            callableStatement.execute();
+            callableStatement = prepareUpdateTokenStatusStatement(connection, token);
+            executeUpdateTokenStatus(callableStatement);
         } catch (SQLException | ClassNotFoundException e) {
             logger.error("Error while updating token status: " + token, e);
         } finally {
-            try {
-                if (callableStatement != null) {
-                    callableStatement.close();
-                }
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logger.error("Error while closing resources", e);
-            }
+            closeResources(null, callableStatement, connection);
         }
     }
+    private CallableStatement prepareUpdateTokenStatusStatement(Connection connection, Token token) throws SQLException {
+        logger.debug("Preparing SQL statement to update token status");
+        CallableStatement callableStatement = connection.prepareCall("{call UPDATE_TOKEN_STATUS(?, ?, ?)}");
+        callableStatement.setInt(1, token.getTokenId());
+        callableStatement.setString(2, token.isExpired() ? "Y" : "N");
+        callableStatement.setString(3, token.isRevoked() ? "Y" : "N");
+        return callableStatement;
+    }
+    private void executeUpdateTokenStatus(CallableStatement callableStatement) throws SQLException {
+        logger.debug("Executing SQL statement to update token status");
+        callableStatement.execute();
+    }
+    private void closeResources(ResultSet resultSet, CallableStatement callableStatement, Connection connection) {
+        logger.debug("Closing resources");
+        try {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (callableStatement != null) {
+                callableStatement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            logger.error("Error while closing resources", e);
+        }
+    }
+    /*END UPDATE TOKEN*/
 }

@@ -3,6 +3,7 @@ package com.i2i.evrencell.aom.repository;
 import com.i2i.evrencell.aom.dto.PackageDetails;
 import com.i2i.evrencell.aom.exception.NotFoundException;
 import com.i2i.evrencell.aom.helper.OracleConnection;
+import com.i2i.evrencell.aom.model.Package;
 import com.i2i.evrencell.voltdb.VoltPackage;
 import oracle.jdbc.OracleTypes;
 import org.slf4j.Logger;
@@ -24,23 +25,16 @@ import java.util.Optional;
 @Repository
 public class PackageRepository {
     private final OracleConnection oracleConnection;
-    private final VoltdbOperator voltdbOperator = new VoltdbOperator();
+    private final VoltdbOperator voltdbOperator;
     private static final Logger logger = LoggerFactory.getLogger(PackageRepository.class);
 
-    public PackageRepository(OracleConnection oracleConnection) {
+    public PackageRepository(OracleConnection oracleConnection,
+                             VoltdbOperator voltdbOperator) {
         this.oracleConnection = oracleConnection;
+        this.voltdbOperator = voltdbOperator;
     }
 
-
-    /**
-     * Get all packages
-     * This method gets all packages from OracleDB with the help of stored procedure
-     *
-     * @return List<Package>
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
-    public List<com.i2i.evrencell.aom.model.Package> getAllPackages() throws SQLException, ClassNotFoundException {
+    public List<Package> getAllPackages() throws SQLException, ClassNotFoundException {
         logger.debug("Getting all packages");
         Connection connection = oracleConnection.getOracleConnection();
         CallableStatement callableStatement = connection.prepareCall("{call SELECT_ALL_PACKAGES(?)}");
@@ -48,7 +42,7 @@ public class PackageRepository {
         callableStatement.execute();
 
         ResultSet resultSet = (ResultSet) callableStatement.getObject(1);
-        List<com.i2i.evrencell.aom.model.Package> packageList = new ArrayList<>();
+        List<Package> packageList = new ArrayList<>();
         while (resultSet.next()) {
             Integer packageId = resultSet.getInt("PACKAGE_ID");
             String packageName = resultSet.getString("PACKAGE_NAME");
@@ -58,7 +52,7 @@ public class PackageRepository {
             double price = resultSet.getDouble("PRICE");
             Integer period = resultSet.getInt("PERIOD");
 
-            com.i2i.evrencell.aom.model.Package packageModel = com.i2i.evrencell.aom.model.Package.builder()
+            Package packageModel = com.i2i.evrencell.aom.model.Package.builder()
                     .packageId(packageId)
                     .packageName(packageName)
                     .amountMinutes(amountMinutes)
@@ -76,28 +70,12 @@ public class PackageRepository {
         return packageList;
     }
 
-    /**
-     * Get user package by MSISDN
-     * This method gets user package by msisdn from voltDb with the help of stored procedure.
-     *
-     * @param msisdn
-     * @return Package
-     * @throws IOException
-     * @throws ProcCallException
-     */
+
     public VoltPackage getUserPackageByMsisdn(String msisdn) throws IOException, ProcCallException {
         return voltdbOperator.getPackageByMsisdn(msisdn);
     }
 
-    /**
-     * Get package details by package name
-     * This method gets package details by package name from oracle with the help of stored procedure
-     *
-     * @param packageName
-     * @return Optional<PackageDetails>
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
+
     public Optional<PackageDetails> getPackageDetails(String packageName) throws SQLException, ClassNotFoundException {
         logger.debug("Getting package details for package: " + packageName);
         logger.debug("Connecting to OracleDB");

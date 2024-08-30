@@ -3,6 +3,7 @@ package com.i2i.evrencell.aom.service;
 import com.i2i.evrencell.aom.dto.PackageDetails;
 import com.i2i.evrencell.aom.dto.PackageDto;
 import com.i2i.evrencell.aom.mapper.PackageMapper;
+import com.i2i.evrencell.aom.model.Package;
 import com.i2i.evrencell.aom.repository.PackageRepository;
 import com.i2i.evrencell.voltdb.VoltPackage;
 import org.slf4j.Logger;
@@ -29,7 +30,7 @@ public class PackageService {
 
     public List<PackageDto> getAllPackages() {
         try {
-            List<com.i2i.evrencell.aom.model.Package> packages = packageRepository.getAllPackages();
+            List<Package> packages = packageRepository.getAllPackages();
             return packages.stream()
                     .map(packageMapper::packageToPackageDto)
                     .toList();

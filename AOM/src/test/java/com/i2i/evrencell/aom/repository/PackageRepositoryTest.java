@@ -3,6 +3,7 @@ package com.i2i.evrencell.aom.repository;
 import com.i2i.evrencell.aom.dto.PackageDetails;
 import com.i2i.evrencell.aom.exception.NotFoundException;
 import com.i2i.evrencell.aom.helper.OracleConnection;
+import com.i2i.evrencell.aom.model.Package;
 import com.i2i.evrencell.voltdb.VoltPackage;
 import com.i2i.evrencell.voltdb.VoltdbOperator;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,7 @@ public class PackageRepositoryTest {
         when(resultSet.getDouble("PRICE")).thenReturn(9.99);
         when(resultSet.getInt("PERIOD")).thenReturn(30);
 
-        List<com.i2i.evrencell.aom.model.Package> packages = packageRepository.getAllPackages();
+        List<Package> packages = packageRepository.getAllPackages();
 
         assertEquals(1, packages.size());
         assertEquals("Test Package", packages.get(0).getPackageName());

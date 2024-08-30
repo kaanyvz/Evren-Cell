@@ -18,7 +18,6 @@ import oracle.jdbc.OracleTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.stereotype.Repository;
 import org.voltdb.client.ProcCallException;
 
@@ -46,30 +45,25 @@ public class CustomerRepository {
     private final CustomerPasswordEncoder customerPasswordEncoder;
     private final JWTService jwtService;
     private final TokenRepository tokenRepository;
-    private AuthenticationManager authenticationManager;
-    private final VoltdbOperator voltdbOperator = new VoltdbOperator();
-    
+    private final VoltdbOperator voltdbOperator;
+
     public CustomerRepository(OracleConnection oracleConnection,
                               BalanceRepository balanceRepository,
                               CustomerPasswordEncoder customerPasswordEncoder,
                               JWTService jwtService,
-                              TokenRepository tokenRepository
-                              ) {
+                              TokenRepository tokenRepository,
+                              VoltdbOperator voltdbOperator
+    ) {
         this.oracleConnection = oracleConnection;
         this.balanceRepository = balanceRepository;
         this.customerPasswordEncoder = customerPasswordEncoder;
         this.jwtService = jwtService;
         this.tokenRepository = tokenRepository;
+        this.voltdbOperator = voltdbOperator;
     }
 
     // ==ORACLE OPERATIONS==
 
-    /**
-     * This method is used to get all customers from the Oracle DB.
-     * @return List<Customer>
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
     public List<Customer> getAllCustomers() throws SQLException, ClassNotFoundException {
         logger.debug("Getting all customers from Oracle DB");
         List<Customer> customers = new ArrayList<>();
@@ -119,28 +113,41 @@ public class CustomerRepository {
     }
 
 
-    /**
-     * This method is used create a customer in the Oracle DB.
-     * It first checks if the customer already exists in the Oracle DB.
-     * If the customer does not exist, it creates the customer in the Oracle DB with procedure calls.
-     * @param registerCustomerRequest
-     * @return
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
+    /*START CREATE CUSTOMER IN ORACLE*/
     public AuthenticationResponse createCustomerInOracle(RegisterCustomerRequest registerCustomerRequest) throws SQLException, ClassNotFoundException {
-
         logger.debug("Creating customer in Oracle DB");
+
         if (customerExists(registerCustomerRequest.msisdn(), registerCustomerRequest.email(), registerCustomerRequest.TCNumber())) {
             throw new RuntimeException("This customer already exists in Oracle DB.");
         }
-        logger.debug("Connecting to Oracle DB");
-        Connection connection = oracleConnection.getOracleConnection();
-        logger.debug("Connected to Oracle DB");
 
+        Connection connection = oracleConnection.getOracleConnection();
+
+        int packageId = retrievePackageId(connection, registerCustomerRequest.packageName());
+        String encodedPassword = encryptPassword(registerCustomerRequest.password());
+
+        int customerId = insertCustomerInOracle(connection, registerCustomerRequest, encodedPassword, packageId);
+        createBalanceInOracle(customerId, packageId);
+
+        User user = createUser(registerCustomerRequest, encodedPassword, customerId);
+        saveUser(user);
+
+        String jwtToken = jwtService.generateToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        saveUserToken(user, jwtToken);
+        connection.close();
+
+        return AuthenticationResponse.builder()
+                .accessToken(jwtToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+    private int retrievePackageId(Connection connection, String packageName) throws SQLException {
         logger.debug("Retrieving package id from Oracle DB.");
         CallableStatement packageStmt = connection.prepareCall("{call SELECT_PACKAGE_ID(?, ?)}");
-        packageStmt.setString(1, registerCustomerRequest.packageName());
+        packageStmt.setString(1, packageName);
         packageStmt.registerOutParameter(2, Types.INTEGER);
         packageStmt.execute();
 
@@ -153,11 +160,17 @@ public class CustomerRepository {
         }
 
         logger.debug("Retrieved package id: " + packageId);
+        return packageId;
+    }
 
+    private String encryptPassword(String password) {
         logger.debug("Encrypting password for customer.");
-        String encodedPassword = customerPasswordEncoder.encrypt(registerCustomerRequest.password());
+        String encodedPassword = customerPasswordEncoder.encrypt(password);
         logger.debug("Password encrypted successfully.");
+        return encodedPassword;
+    }
 
+    private int insertCustomerInOracle(Connection connection, RegisterCustomerRequest registerCustomerRequest, String encodedPassword, int packageId) throws SQLException {
         logger.debug("Creating customer in Oracle DB.");
         CallableStatement customerStmt = connection.prepareCall("{call INSERT_CUSTOMER(?, ?, ?, ?, ?, ?, ?)}");
         customerStmt.setString(1, registerCustomerRequest.name());
@@ -167,7 +180,6 @@ public class CustomerRepository {
         customerStmt.setString(5, encodedPassword);
         customerStmt.setTimestamp(6, new Timestamp(System.currentTimeMillis()));
         customerStmt.setString(7, registerCustomerRequest.TCNumber());
-        logger.debug("Executing INSERT_CUSTOMER");
         customerStmt.execute();
         logger.debug("INSERT_CUSTOMER executed successfully");
         customerStmt.close();
@@ -181,17 +193,19 @@ public class CustomerRepository {
         }
         rs.close();
         stmt.close();
+        return customerId;
+    }
 
-
-
-
+    private void createBalanceInOracle(int customerId, int packageId) throws SQLException, ClassNotFoundException {
         CreateBalanceRequest createBalanceRequest = CreateBalanceRequest.builder()
                 .customerId(customerId)
                 .packageId(packageId)
                 .build();
         balanceRepository.createOracleBalance(createBalanceRequest);
+    }
 
-        User user = User.builder()
+    private User createUser(RegisterCustomerRequest registerCustomerRequest, String encodedPassword, int customerId) {
+        return User.builder()
                 .msisdn(registerCustomerRequest.msisdn())
                 .name(registerCustomerRequest.name())
                 .surname(registerCustomerRequest.surname())
@@ -200,34 +214,10 @@ public class CustomerRepository {
                 .TCNumber(registerCustomerRequest.TCNumber())
                 .sDate(new Timestamp(System.currentTimeMillis()))
                 .role(Role.USER)
-                .build();
-        saveUser(user);
-
-        Statement userStatement = connection.createStatement();
-        ResultSet resultSet = userStatement.executeQuery(OracleQueries.SELECT_USER_ID);
-        int userId = 0;
-        if (resultSet.next()) {
-            userId = resultSet.getInt(1);
-        }
-        user.setUserId(userId);
-        resultSet.close();
-        userStatement.close();
-
-
-
-        String jwtToken = jwtService.generateToken(user);
-        logger.debug("JWT Token generated successfully for customer: " + registerCustomerRequest.msisdn());
-        String refreshToken = jwtService.generateRefreshToken(user);
-        logger.debug("Refresh Token generated successfully for customer: " + registerCustomerRequest.msisdn());
-
-        saveUserToken(user, jwtToken);
-        connection.close();
-
-        return AuthenticationResponse.builder()
-                .accessToken(jwtToken)
-                .refreshToken(refreshToken)
+                .userId(customerId)
                 .build();
     }
+
 
     public void saveUser(User user) throws SQLException, ClassNotFoundException {
         logger.debug("Saving user: " + user.getUserId());
@@ -261,6 +251,7 @@ public class CustomerRepository {
             }
         }
     }
+    /*END CREATE CUSTOMER IN ORACLE*/
 
     private void saveUserToken(User user, String jwtToken) {
         Token token = Token.builder()
@@ -274,64 +265,77 @@ public class CustomerRepository {
         tokenRepository.addToken(token);
     }
 
-    public Optional<User> findByMsisdn(String msisdn){
+    /*START OF FIND USER BY MSISDN*/
+    public Optional<User> findByMsisdn(String msisdn) {
         logger.debug("Finding user by MSISDN: " + msisdn);
+
         Connection connection = null;
         CallableStatement callableStatement = null;
         ResultSet resultSet = null;
+
         try {
             connection = oracleConnection.getOracleConnection();
-            callableStatement = connection.prepareCall("{call FIND_USER_BY_MSISDN(?, ?)}");
-            callableStatement.setString(1, msisdn);
-            callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
-            callableStatement.execute();
-            resultSet = (ResultSet) callableStatement.getObject(2);
-            if (resultSet.next()) {
-                User user = User.builder()
-                        .userId(resultSet.getInt("ID"))
-                        .msisdn(resultSet.getString("MSISDN"))
-                        .name(resultSet.getString("FIRST_NAME"))
-                        .surname(resultSet.getString("LAST_NAME"))
-                        .email(resultSet.getString("EMAIL"))
-                        .password(resultSet.getString("PASSWORD"))
-                        .TCNumber(resultSet.getString("TC_NO"))
-                        .sDate(resultSet.getTimestamp("SDATE"))
-                        .role(Role.valueOf(resultSet.getString("ROLE")))
-                        .build();
-                return Optional.of(user);
-            }
+            callableStatement = prepareFindByMsisdnStatement(connection, msisdn);
+            resultSet = executeFindByMsisdn(callableStatement);
+            return mapUserFromResultSet(resultSet);
         } catch (SQLException | ClassNotFoundException e) {
             throw new NotFoundException("Customer not found by msisdn: " + msisdn);
-
         } finally {
-            try {
-                if (resultSet != null) {
-                    resultSet.close();
-                }
-                if (callableStatement != null) {
-                    callableStatement.close();
-                }
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logger.error("Error while closing resources", e);
-            }
+            closeResources(resultSet, callableStatement, connection);
+        }
+    }
+
+    private CallableStatement prepareFindByMsisdnStatement(Connection connection, String msisdn) throws SQLException {
+        logger.debug("Creating callable statement to find user by MSISDN");
+        CallableStatement callableStatement = connection.prepareCall("{call FIND_USER_BY_MSISDN(?, ?)}");
+        callableStatement.setString(1, msisdn);
+        callableStatement.registerOutParameter(2, OracleTypes.CURSOR);
+        return callableStatement;
+    }
+
+    private ResultSet executeFindByMsisdn(CallableStatement callableStatement) throws SQLException {
+        logger.debug("Executing FIND_USER_BY_MSISDN");
+        callableStatement.execute();
+        return (ResultSet) callableStatement.getObject(2);
+    }
+
+    private Optional<User> mapUserFromResultSet(ResultSet resultSet) throws SQLException {
+        if (resultSet.next()) {
+            User user = User.builder()
+                    .userId(resultSet.getInt("ID"))
+                    .msisdn(resultSet.getString("MSISDN"))
+                    .surname(resultSet.getString("LAST_NAME"))
+                    .name(resultSet.getString("FIRST_NAME"))
+                    .email(resultSet.getString("EMAIL"))
+                    .password(resultSet.getString("PASSWORD"))
+                    .TCNumber(resultSet.getString("TC_NO"))
+                    .sDate(resultSet.getTimestamp("SDATE"))
+                    .role(Role.valueOf(resultSet.getString("ROLE")))
+                    .build();
+            return Optional.of(user);
         }
         return Optional.empty();
     }
 
+    private void closeResources(ResultSet resultSet, CallableStatement callableStatement, Connection connection) {
+        logger.debug("Closing result set, callable statement, and connection");
+        try {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (callableStatement != null) {
+                callableStatement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            logger.error("Error while closing resources", e);
+        }
+    }
+    /*END OF FIND USER BY MSISDN*/
 
-    /**
-    * This method checks if the customer already exists in the Oracle DB.
-    * If the customer exists, it returns true, otherwise it returns false.
-    * @param msisdn
-    * @param email
-    * @param tcNo
-    * @return boolean
-    * @throws SQLException
-    * @throws ClassNotFoundException
-     */
+
     private boolean customerExists(String msisdn, String email, String tcNo) throws SQLException, ClassNotFoundException {
         logger.debug("Checking if customer exists in Oracle DB.");
 
@@ -351,39 +355,6 @@ public class CustomerRepository {
         return exists;
     }
 
-    /**
-     * This method is used to get the encoded password of a customer by their MSISDN.
-     * @param msisdn
-     * @return
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
-    public String getEncodedCustomerPasswordByMsisdn(String msisdn) throws SQLException, ClassNotFoundException {
-        logger.debug("Getting encoded password of customer by MSISDN");
-        Connection connection = oracleConnection.getOracleConnection();
-        PreparedStatement stmt = connection.prepareStatement(OracleQueries.SELECT_PASSWORD);
-        stmt.setString(1, msisdn);
-        ResultSet resultSet= stmt.executeQuery();
-        String encodedPassword = null;
-        if (resultSet.next()) {
-            encodedPassword = resultSet.getString("PASSWORD");
-        }
-        resultSet.close();
-        stmt.close();
-        connection.close();
-        return encodedPassword;
-
-    }
-
-    /**
-     * This method is used to get a customer by their MSISDN.
-     * @param email
-     * @param tcNumber
-     * @param encryptedPassword
-     * @return
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
     public void updatePasswordInOracle(String email, String tcNumber, String encryptedPassword) throws
             SQLException,
             ClassNotFoundException {
@@ -404,15 +375,7 @@ public class CustomerRepository {
         connection.close();
     }
 
-    /**
-     * This method is used to insert a notification log in the Oracle DB.
-     * It inserts the notification type, notification time, and customer ID into the notification log table via a procedure call.
-     * @param notificationType
-     * @param notificationTime
-     * @param customerId
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
+
     public void insertNotificationLogInOracle(String notificationType, Timestamp notificationTime, int customerId) throws SQLException, ClassNotFoundException {
         logger.debug("Inserting notification log in Oracle DB");
         Connection connection = oracleConnection.getOracleConnection();
@@ -431,22 +394,24 @@ public class CustomerRepository {
 
 
     // ==VOLT OPERATIONS==
-    /**
-     * This method is used to create a customer in the VoltDB.
-     * @param registerCustomerRequest
-     * @return ResponseEntity
-     * @throws IOException
-     * @throws ProcCallException
-     * @throws InterruptedException
-     */
+
+    /*START CREATE CUSTOMER IN VOLT*/
     public ResponseEntity<String> createCustomerInVoltDB(RegisterCustomerRequest registerCustomerRequest) throws IOException, ProcCallException, InterruptedException {
-
         logger.debug("Creating customer in VoltDB");
-        int packageId = voltdbOperator.getPackageIdByName(registerCustomerRequest.packageName());
-        int maxCustomerId = voltdbOperator.getMaxCustomerId();
-        int customerId = maxCustomerId + 1;
 
-        logger.debug("Inserting customer in VoltDB");
+        int packageId = voltdbOperator.getPackageIdByName(registerCustomerRequest.packageName());
+        int customerId = getNewCustomerId();
+
+        insertCustomerInVoltDB(registerCustomerRequest, customerId);
+        return createBalanceInVoltDB(customerId, packageId);
+    }
+
+    private int getNewCustomerId(){
+        int maxCustomerId = voltdbOperator.getMaxCustomerId();
+        return maxCustomerId + 1;
+    }
+
+    private void insertCustomerInVoltDB(RegisterCustomerRequest registerCustomerRequest, int customerId){
         voltdbOperator.insertCustomer(
                 customerId,
                 registerCustomerRequest.name(),
@@ -458,14 +423,16 @@ public class CustomerRepository {
                 registerCustomerRequest.TCNumber()
         );
         logger.debug("Customer inserted successfully in VoltDB");
+    }
+
+    private ResponseEntity<String> createBalanceInVoltDB(int customerId, int packageId) throws IOException, ProcCallException, InterruptedException {
         CreateBalanceRequest createBalanceRequest = CreateBalanceRequest.builder()
                 .customerId(customerId)
                 .packageId(packageId)
                 .build();
-
-
         return balanceRepository.createVoltBalance(createBalanceRequest);
     }
+    /*END CREATE CUSTOMER IN VOLT*/
 
 
     public void updatePasswordInVoltDB(String email, String tcNumber, String encryptedPassword) throws IOException, InterruptedException, ProcCallException {
@@ -473,19 +440,6 @@ public class CustomerRepository {
         voltdbOperator.updatePassword(email, tcNumber, encryptedPassword);
     }
 
-
-    /**
-     * This method is used to check if a customer exists in the Oracle and VoltDB.
-     * If the customer exists in both databases, it returns true, otherwise it returns false.
-     * @param email
-     * @param tcNumber
-     * @return boolean
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     * @throws IOException
-     * @throws ProcCallException
-     * @throws InterruptedException
-     */
     public boolean checkCustomerExists(String email, String tcNumber) throws
                                                                             SQLException,
                                                                             ClassNotFoundException {
@@ -505,16 +459,4 @@ public class CustomerRepository {
 
     }
 
-    public boolean isCustomerExistsByMsisdn(String msisdn) throws SQLException, ClassNotFoundException {
-        logger.debug("Checking if customer exists in VoltDB by MSISDN: " + msisdn);
-        Connection connection = oracleConnection.getOracleConnection();
-        CallableStatement callableStatement = connection.prepareCall("{call CHECK_CUSTOMER_EXISTS_BY_MSISDN(?, ?)}");
-        callableStatement.setString(1, msisdn);
-        callableStatement.registerOutParameter(2, Types.INTEGER);
-        callableStatement.execute();
-        int userExists = callableStatement.getInt(2);
-        callableStatement.close();
-        connection.close();
-        return userExists > 0;
-    }
 }

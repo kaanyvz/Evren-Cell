@@ -84,44 +84,18 @@ public class ForgetPasswordService {
         }
     }
 
-    /**
-     * This method checks if the customer exists in the database
-     * @param email
-     * @param tcNumber
-     * @return boolean
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     * @throws IOException
-     * @throws ProcCallException
-     * @throws InterruptedException
-     */
+
     private boolean checkCustomerExists(String email, String tcNumber) throws SQLException, ClassNotFoundException, IOException, ProcCallException, InterruptedException {
         return customerRepository.checkCustomerExists(email, tcNumber);
     }
 
-    /**
-     * This method updates the password of the customer in both Oracle and VoltDB
-     * @param email
-     * @param tcNumber
-     * @param encryptedPassword
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     * @throws IOException
-     * @throws ProcCallException
-     * @throws InterruptedException
-     */
+
     private void updatePassword(String email, String tcNumber, String encryptedPassword) throws SQLException, ClassNotFoundException, IOException, ProcCallException, InterruptedException {
         customerRepository.updatePasswordInOracle(email, tcNumber, encryptedPassword);
         customerRepository.updatePasswordInVoltDB(email, tcNumber, encryptedPassword);
     }
 
-    /**
-     * This method sends an email to the customer with the new password
-     * The email contains the new password and a message to keep it safe and secure
-     * @param email
-     * @param newPassword
-     * @throws MessagingException
-     */
+
     private void sendEmail(String email, String newPassword) throws MessagingException {
         logger.debug("Sending email to customer with new password");
         MimeMessage message = javaMailSender.createMimeMessage();
@@ -142,15 +116,7 @@ public class ForgetPasswordService {
         logger.debug("Email sent successfully");
     }
 
-    /**
-     * This method retrieves the customer ID from Oracle to be used in the notification log
-     *
-     * @param email
-     * @param tcNumber
-     * @return int
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     */
+
     private int retrieveCustomerIdFromOracle(String email, String tcNumber) throws SQLException, ClassNotFoundException {
         logger.debug("Retrieving customer ID from Oracle");
         Connection connection = oracleConnection.getOracleConnection();
@@ -165,30 +131,12 @@ public class ForgetPasswordService {
         return customerId;
     }
 
-    /**
-     * This method inserts a notification log in both Oracle and VoltDB
-     *
-     * @param notificationTime
-     * @param customerIdOracle
-     * @throws SQLException
-     * @throws ClassNotFoundException
-     * @throws IOException
-     * @throws ProcCallException
-     * @throws InterruptedException
-     */
     private void insertNotificationLogs(Timestamp notificationTime, int customerIdOracle)
             throws SQLException, ClassNotFoundException, IOException, ProcCallException, InterruptedException {
         customerRepository.insertNotificationLogInOracle("Password Reset", notificationTime, customerIdOracle);
     }
 
 
-    /**
-     * This method generates a random password for the customer
-     * The password is 15 characters long and contains at least one uppercase letter, one lowercase letter, and one number
-     * The rest of the characters are randomly selected from the pool of uppercase letters, lowercase letters, and numbers
-     * The password is then shuffled to ensure randomness
-     * @return String
-     */
     private String generateRandomPassword() {
         logger.debug("Generating random password");
         final String upperCaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
